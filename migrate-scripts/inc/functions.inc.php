@@ -247,6 +247,53 @@ function getRemotePackages()
 }
 
 
+// Function to retrieve database credentials from .env file
+function getDatabaseCredentialsFromEnv($envContent, $dbType = 'default')
+{
+    $prefix = ($dbType === 'rootdb') ? 'ROOT_DB_' : 'DB_';
+    
+    // Extract variables from .env content
+    $credentials = [
+        'name' => '',
+        'user' => '',
+        'password' => '',
+        'host' => 'localhost',
+        'port' => '3306'
+    ];
+    
+    // Parse NAME/ROOT_DB_NAME
+    if (preg_match('/' . $prefix . 'NAME\s*=\s*(.+?)(?:\n|$)/', $envContent, $match)) {
+        $credentials['name'] = trim($match[1], " \"\'\n\r");
+    }
+    
+    // Parse USER/ROOT_DB_USER
+    if (preg_match('/' . $prefix . 'USER\s*=\s*(.+?)(?:\n|$)/', $envContent, $match)) {
+        $credentials['user'] = trim($match[1], " \"\'\n\r");
+    }
+    
+    // Parse PASSWORD/ROOT_DB_PASSWORD
+    if (preg_match('/' . $prefix . 'PASSWORD\s*=\s*(.+?)(?:\n|$)/', $envContent, $match)) {
+        $credentials['password'] = trim($match[1], " \"\'\n\r");
+    }
+    
+    // Parse HOST/ROOT_DB_HOST
+    if (preg_match('/' . $prefix . 'HOST\s*=\s*(.+?)(?:\n|$)/', $envContent, $match)) {
+        $credentials['host'] = trim($match[1], " \"\'\n\r");
+    }
+    
+    // Parse PORT/ROOT_DB_PORT
+    if (preg_match('/' . $prefix . 'PORT\s*=\s*(.+?)(?:\n|$)/', $envContent, $match)) {
+        $credentials['port'] = trim($match[1], " \"\'\n\r");
+    }
+    
+    // Return null if critical credentials are missing
+    if (empty($credentials['name']) || empty($credentials['user'])) {
+        return null;
+    }
+    
+    return $credentials;
+}
+
 // Function to retrieve database credentials from a settings file
 function getDatabaseCredentialsFromSettings($settingsContent, $dbName)
 {
@@ -298,11 +345,24 @@ function getRemoteDatabaseCyberPanelCredentials()
         return $GLOBALS['remoteCyberPanelDbCredentials'];
     }
 
+    // Try .env first
+    $envPath = "/usr/local/CyberCP/.env";
+    $env = trim(executeRemoteSSHCommand("cat $envPath 2>/dev/null", sudo: true));
+    
+    if ($env) {
+        $credentials = getDatabaseCredentialsFromEnv($env, 'default');
+        if ($credentials) {
+            $GLOBALS['remoteCyberPanelDbCredentials'] = $credentials;
+            return $GLOBALS['remoteCyberPanelDbCredentials'];
+        }
+    }
+
+    // Fallback to settings.py
     $settingsPath = "/usr/local/CyberCP/CyberCP/settings.py";
     $settings = trim(executeRemoteSSHCommand("cat $settingsPath", sudo: true));
 
     if (!$settings) {
-        output("Failed to retrieve remote database credentials.", exitCode: 1);
+        output("Failed to retrieve remote database credentials from .env or settings.py.", exitCode: 1);
     }
 
     $GLOBALS['remoteCyberPanelDbCredentials'] = getDatabaseCredentialsFromSettings($settings, 'default');
@@ -318,11 +378,24 @@ function getRemoteDatabaseRootCredentials()
         return $GLOBALS['remoteRootDbCredentials'];
     }
 
+    // Try .env first
+    $envPath = "/usr/local/CyberCP/.env";
+    $env = trim(executeRemoteSSHCommand("cat $envPath 2>/dev/null", sudo: true));
+    
+    if ($env) {
+        $credentials = getDatabaseCredentialsFromEnv($env, 'rootdb');
+        if ($credentials) {
+            $GLOBALS['remoteRootDbCredentials'] = $credentials;
+            return $GLOBALS['remoteRootDbCredentials'];
+        }
+    }
+
+    // Fallback to settings.py
     $settingsPath = "/usr/local/CyberCP/CyberCP/settings.py";
     $settings = trim(executeRemoteSSHCommand("cat $settingsPath", sudo: true));
 
     if (!$settings) {
-        output("Failed to retrieve remote database credentials.", exitCode: 1);
+        output("Failed to retrieve remote database credentials from .env or settings.py.", exitCode: 1);
     }
 
     $GLOBALS['remoteRootDbCredentials'] = getDatabaseCredentialsFromSettings($settings, 'rootdb');
@@ -337,11 +410,25 @@ function getLocalDatabaseCyberPanelCredentials()
         return $GLOBALS['localCyberPanelDbCredentials'];
     }
 
+    // Try .env first
+    $envPath = "/usr/local/CyberCP/.env";
+    if (file_exists($envPath)) {
+        $env = trim(file_get_contents($envPath));
+        if ($env) {
+            $credentials = getDatabaseCredentialsFromEnv($env, 'default');
+            if ($credentials) {
+                $GLOBALS['localCyberPanelDbCredentials'] = $credentials;
+                return $GLOBALS['localCyberPanelDbCredentials'];
+            }
+        }
+    }
+
+    // Fallback to settings.py
     $settingsPath = "/usr/local/CyberCP/CyberCP/settings.py";
     $settings = trim(file_get_contents($settingsPath));
 
     if (!$settings) {
-        output("Failed to retrieve remote database credentials.", exitCode: 1);
+        output("Failed to retrieve local database credentials from .env or settings.py.", exitCode: 1);
     }
 
     $GLOBALS['localCyberPanelDbCredentials'] = getDatabaseCredentialsFromSettings($settings, 'default');
@@ -356,11 +443,25 @@ function getLocalDatabaseRootCredentials()
         return $GLOBALS['localRootDbCredentials'];
     }
 
+    // Try .env first
+    $envPath = "/usr/local/CyberCP/.env";
+    if (file_exists($envPath)) {
+        $env = trim(file_get_contents($envPath));
+        if ($env) {
+            $credentials = getDatabaseCredentialsFromEnv($env, 'rootdb');
+            if ($credentials) {
+                $GLOBALS['localRootDbCredentials'] = $credentials;
+                return $GLOBALS['localRootDbCredentials'];
+            }
+        }
+    }
+
+    // Fallback to settings.py
     $settingsPath = "/usr/local/CyberCP/CyberCP/settings.py";
     $settings = trim(file_get_contents($settingsPath));
 
     if (!$settings) {
-        output("Failed to retrieve remote database credentials.", exitCode: 1);
+        output("Failed to retrieve local database credentials from .env or settings.py.", exitCode: 1);
     }
 
     $GLOBALS['localRootDbCredentials'] = getDatabaseCredentialsFromSettings($settings, 'rootdb');
