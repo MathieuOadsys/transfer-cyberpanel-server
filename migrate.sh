@@ -42,7 +42,7 @@ if [ ! -f "config.ini" ]; then
 fi
 
 # Read remote password from config.ini
-remotePassword=$(grep '^password' config.ini | cut -d'=' -f2 | tr -d ' ')
+remotePassword=$(grep '^password' config.ini | cut -d'=' -f2 | tr -d ' '| tr -d '"' )
 
 if [ -n "$remotePassword" ] && ! type -P sshpass &>/dev/null; then
     echo "sshpass is not installed. Installing it now..."
