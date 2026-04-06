@@ -71,9 +71,10 @@ function transferWebsiteDatabases($domain)
 
         if (array_search($dbName, array_column($localDatabases, 'dbName')) !== false) {
             output("Database `$dbName` already exists locally for `$domain`. Skipping its creation.");
-            continue;
+//            continue;
         }
-
+        else
+        {
         output("Creating local database `$dbName` for `$domain`...");
 
         $randomPassword = bin2hex(random_bytes(6));
@@ -111,7 +112,7 @@ function transferWebsiteDatabases($domain)
                 output("Successfully updated local MySQL password for user `$dbUser`.", success: true);
             }
         }
-
+        }
         $dumpFileName = "mysqldumps/$dbName-$dbUser.sql";
         output("Exporting remote MySQL database `$dbName`...");
 
