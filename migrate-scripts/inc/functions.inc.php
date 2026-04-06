@@ -15,7 +15,11 @@ function queryRemoteSql($query, $rootUser = true)
     $remoteDbCredentials = getRemoteDatabaseRootCredentials();
 
     $escapedQuery = escapeshellarg($query);
-    $command = "mysql -u{$remoteDbCredentials['user']} -p{$remoteDbCredentials['password']} --batch cyberpanel -e $escapedQuery 2>&1";
+
+    $hostOption = !empty($remoteDbCredentials['host']) ? "-h {$remoteDbCredentials['host']}" : "";
+    $portOption = !empty($remoteDbCredentials['port']) ? "-P {$remoteDbCredentials['port']}" : "";
+
+    $command = "mysql -u{$remoteDbCredentials['user']} -p{$remoteDbCredentials['password']} $hostOption $portOption --batch cyberpanel -e $escapedQuery 2>&1";
 
     $output = executeRemoteSSHCommand($command);
 
@@ -55,7 +59,10 @@ function execLocalSql($query, $rootUser = false)
     $query = str_replace("\n", " ", $query);
     $query = str_replace('$', '\$', $query);
 
-    $command = "mysql -u{$localDbCredentials['user']} -p{$localDbCredentials['password']} --batch -e \"$query\" {$localDbCredentials['name']}";
+    $hostOption = !empty($localDbCredentials['host']) ? "-h {$localDbCredentials['host']}" : "";
+    $portOption = !empty($localDbCredentials['port']) ? "-P {$localDbCredentials['port']}" : "";
+
+    $command = "mysql -u{$localDbCredentials['user']} -p{$localDbCredentials['password']} $hostOption $portOption --batch -e \"$query\" {$localDbCredentials['name']}";
     $output = shellExec($command);
 
     return $output;
@@ -71,7 +78,11 @@ function queryLocalSql($query, $rootUser = false)
 
     $query = str_replace("\n", " ", $query);
     $escapedQuery = escapeshellarg($query);
-    $command = "mysql -u{$localDbCredentials['user']} -p{$localDbCredentials['password']} --batch {$localDbCredentials['name']} -e $escapedQuery 2>&1";
+
+    $hostOption = !empty($localDbCredentials['host']) ? "-h {$localDbCredentials['host']}" : "";
+    $portOption = !empty($localDbCredentials['port']) ? "-P {$localDbCredentials['port']}" : "";
+
+    $command = "mysql -u{$localDbCredentials['user']} -p{$localDbCredentials['password']} $hostOption $portOption --batch {$localDbCredentials['name']} -e $escapedQuery 2>&1";
 
     $output = shellExec($command);
 
@@ -249,14 +260,31 @@ function getDatabaseCredentialsFromSettings($settingsContent, $dbName)
 
     $settingsContent = $output_array[1][0];
 
-    preg_match("/'NAME': '(.+?)'/", $settingsContent, $name);
-    preg_match("/'USER': '(.+?)'/", $settingsContent, $user);
-    preg_match("/'PASSWORD': '(.+?)'/", $settingsContent, $password);
+    // Function to extract value, handling both old and new formats
+    $extractValue = function($field) use ($settingsContent) {
+        // Try old format: 'FIELD': 'value'
+        if (preg_match("/'$field': '(.+?)'/", $settingsContent, $match)) {
+            return $match[1];
+        }
+        // Try new format: 'FIELD': os.getenv('VAR', 'default')
+        elseif (preg_match("/'$field': os\.getenv\('(.+?)', '(.+?)'\)/", $settingsContent, $match)) {
+            return getenv($match[1]) ?: $match[2];
+        }
+        return '';
+    };
+
+    $name = $extractValue('NAME');
+    $user = $extractValue('USER');
+    $password = $extractValue('PASSWORD');
+    $host = $extractValue('HOST');
+    $port = $extractValue('PORT');
 
     return [
-        'name' => $name[1] ?? '',
-        'user' => $user[1] ?? '',
-        'password' => $password[1] ?? ''
+        'name' => $name,
+        'user' => $user,
+        'password' => $password,
+        'host' => $host,
+        'port' => $port
     ];
 }
 
